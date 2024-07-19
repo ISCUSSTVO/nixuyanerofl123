@@ -101,34 +101,38 @@ async def steammailpass(message: types.Message, state: FSMContext):
     await message.reply("Регистрация завершена!")
 
 
-@dp.callback_query_handler(text="chek")
+dp.callback_query_handler(text="chek")
 async def get_last_steam_email(call: CallbackQuery):
+    # Обработчик нажатия кнопки "chek" в телеграм-боте
+
     try:
         loop = asyncio.get_event_loop()
+        # Создание цикла событий asyncio
 
         if user_data is None:
             await call.message.answer("Не удалось получить данные из почтового ящика")
             return
+        # Проверка наличия данных пользователя из почтового ящика
 
         mail_connection = await loop.run_in_executor(
             None, lambda: imaplib.IMAP4_SSL(IMAP_SERVER)
         )
+        # Установка защищенного соединения с почтовым сервером
+
         mail_connection.login(user_data[0], user_data[1])
         mail_connection.select("INBOX")
+        # Вход в почтовый ящик и выбор папки "INBOX"
 
         status, data = mail_connection.search(None, "FROM", '"Steam"')
-        if status != "OK":
-            await call.message.answer("Не удалось найти письма от Steam")
-            return
+        # Поиск писем от Steam
 
         latest_email_id = data[0].split()[-1]
         status, data = mail_connection.fetch(latest_email_id, "(RFC822)")
-        if status != "OK":
-            await call.message.answer("Не удалось получить содержимое письма от Steam")
-            return
+        # Извлечение последнего письма от Steam
 
         raw_email = data[0][1]
         email_message = email.message_from_bytes(raw_email)
+        # Извлечение содержимого письма
 
         decoded_payload = None
         if email_message.is_multipart():
@@ -138,9 +142,9 @@ async def get_last_steam_email(call: CallbackQuery):
                     break
         else:
             decoded_payload = email_message.get_payload(decode=True).decode("utf-8")
+        # Декодирование содержимого письма
 
         if decoded_payload:
-
             match = re.search(r'Код доступа(.*?)Если это были не вы', decoded_payload, re.DOTALL)
             if match:
                 extracted_phrase = match.group(1).strip()
@@ -149,9 +153,11 @@ async def get_last_steam_email(call: CallbackQuery):
                 await call.message.answer("Не удалось найти заданные фразы в письме")
         else:
             await call.message.answer("Не удалось декодировать содержимое письма")
+        # Извлечение кода доступа из письма и отправка его пользователю
 
     except Exception as e:
         await call.message.answer(f"Произошла ошибка при чтении почты: {e}")
     finally:
         if "mail_connection" in locals():
             mail_connection.logout()
+    # Обработка ошибок и выход из почтового ящика
