@@ -9,9 +9,9 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 import keyboard
 
-
 from createbot import dp
 from database import database
+
 
 
 IMAP_SERVER = "imap.mail.ru"
@@ -23,15 +23,75 @@ class FSMloginsteam(StatesGroup):
     email = State()
     empass = State()
 
+moderator = ['krutoy_cell']
+
+@dp.message_handler(commands = ["moderator"])
+async def moderator_chek(message: types.Message):
+    if message.from_user.username in moderator:
+        await message.answer(
+            'чо ты хочешь?', reply_markup=keyboard.test.moderator_action
+            )
+        
+@dp.callback_query_handler(text_contains=["addacc"])
+async def add_account(call: CallbackQuery):
+    await call.message.answer("Введите свой логин стим")
+    await FSMloginsteam.steamlogin.set()
+
+
+@dp.message_handler(state=FSMloginsteam.steamlogin)
+async def stlogin(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data["steamlogin"] = message.text
+    await message.reply("Теперь введите свою почту")
+    await FSMloginsteam.email.set()
+
+
+@dp.message_handler(state=FSMloginsteam.email)
+async def steammail(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data["email"] = message.text
+    await message.reply("Теперь введите пароль от почты")
+    await FSMloginsteam.empass.set()
+
+
+@dp.message_handler(state=FSMloginsteam.empass)
+async def steammailpass(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data["empass"] = message.text
+    await database.sql_add_command(state)
+    await state.finish()
+    await message.reply("Аккаунт в базе данных")
+
+@dp.callback_query_handler(lambda x: x.data and x.data.startswith('del '))
+async def del_callback_run(callback_querry: types.CallbackQuery):
+    await database.sql_delete_command(callback_querry.data.replace('del ', ''))
+    await callback_querry.answer(text=f'{callback_querry.data.replace("del ", "")} запись удалена.', show_alert=True)
+
+@dp.callback_query_handler(text_contains=["dellacc"])
+async def delete_items(call: CallbackQuery):
+    conn = sqlite3.connect('base.db')  # Открываем соединение с базой данных
+    cur = conn.cursor()
+    
+    read = await database.sql_read2(cur)  # Передаем объект cursor для выполнения запроса
+    for ret in read:
+        keyboard = InlineKeyboardMarkup()
+        keyboard.add(InlineKeyboardButton(f'Удалить {ret[1]}', callback_data=f'del {ret[1]}'))
+    
+        await call.message.answer(f'логин: {ret[0]}\nпочта: {ret[1]}\nпороль: {ret[2]}')
+        await call.message.answer('^^^', reply_markup=keyboard)
+
+        await database.sql_delete_command(ret[1])  # Удаление записи
+    conn.commit()  # Фиксируем изменения в базе данных
+    cur.close()  # Закрываем курсор
+    conn.close()
 
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
-    keyboard = InlineKeyboardMarkup()
-    keyboard.add(InlineKeyboardButton(text="Да", callback_data="login"))
-    keyboard.add(InlineKeyboardButton(text="Нет", callback_data="register"))
+    keyboard123= InlineKeyboardMarkup()
+    keyboard123.add(InlineKeyboardButton(text="Да", callback_data="login"))
 
     await message.answer(
-        text="Здравствуйте, вы зарегистрированы?", reply_markup=keyboard
+        text="Здравствуйте, проверить почту?", reply_markup=keyboard123
     )
 
 
@@ -66,7 +126,7 @@ async def check_number(message: types.Message):
             f"Этот логин найден в базе данных. Почта: {mail}.Пароль: {empass}\n Проверить почту?", reply_markup=keyboard.test.login
         )
     else:
-        await message.answer(f"Логин {message.text} не найден в базе данных.")
+        await message.answer(f"Логин {message.text} не найден в базе данных.\nИДИТЕ НАХУЙ")
     conn.close()
 
 

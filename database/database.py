@@ -2,10 +2,10 @@ import sqlite3 as sq
 
 
 def create_database():
-    global conn, cursor
+    global conn, cur
     conn = sq.connect('base.db')
-    cursor = conn.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS list (steamlogin TEXT, mail TEXT, empass TEXT)")
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE IF NOT EXISTS list (steamlogin TEXT, mail TEXT, empass TEXT)")
 
     conn.commit()
     conn.close()
@@ -25,3 +25,16 @@ async def sql_read(cur, message):
 
 async def sql_read2(cur):
     return cur.execute('SELECT * FROM list').fetchall()
+
+async def sql_delete_command(data):
+    conn = sq.connect('base.db') 
+    cur = conn.cursor()
+    
+    try:
+        cur.execute('DELETE FROM list WHERE steamlogin = ?', (data,))
+        conn.commit() 
+    except sq.Error as e:
+        print(f"Ошибка при удалении записи: {e}")
+    finally:
+        cur.close()  # Закрываем курсор
+        conn.close()
